@@ -1,0 +1,4 @@
+cache_budget,compression_ratio,adaptive_proposed,priority,fifo,score_merge,uniform_merge
+512 slots,16x,76.7,50.0,20.0,20.0,20.0
+256 slots,32x,93.3,23.3,20.0,16.7,20.0
+128 slots,64x,70.0,10.0,0.0,0.0,0.0

@@ -1,0 +1,8 @@
+context_length,standard_150m_accuracy,anchormass_150m_accuracy
+4K,93.3,100.0
+8K,80.0,80.0
+16K,66.7,86.7
+32K,46.7,86.7
+64K,6.7,33.3
+128K,0.0,6.7
+256K,0.0,0.0
