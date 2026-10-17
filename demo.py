@@ -72,7 +72,7 @@ def main():
     )
     print(f"Prefill 完了:")
     print(f"   - 入力系列長: {args.ctx_len:,} トークン")
-    print(f"   - 各層の Global キャッシュスロット数: 平均 {avg_slots:.0f} slots (上限 {args.max_cache} スロットに完全束縛)")
+    print(f"   - 各層の Global キャッシュスロット数: 平均 {avg_slots:.0f} slots (上限 {args.max_cache} スロット以下に維持)")
     print(f"   - 全14層の合計 KV キャッシュメモリ: {total_bytes / (1024 ** 2):.1f} MB")
     print("\nAnchorMass Attention の上限付きキャッシュ機構が正常に機能しています！")
 

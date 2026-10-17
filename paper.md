@@ -2,7 +2,6 @@
 
 **AnchorMass: Bounded KV-Cache Long-Context Language Modeling via Outlier-Preserving Block Compression and Energy-Guided Merging**
 
-- **ステータス**: Preprint / Technical Paper Draft (2026年10月17日)
 - **対象モデル実装**: [`anchormass/model.py`](../anchormass/model.py)
   - 言語モデルクラス: [`AnchorMassForCausalLM`](../anchormass/model.py#L941-L1118)
   - 注意層クラス: [`AnchorMassAttention`](../anchormass/model.py#L176-L921)
@@ -11,7 +10,7 @@
 
 ---
 
-## Abstract（要旨）
+## Abstract
 
 自己回帰型 Transformer 言語モデルにおいて、Key-Value（KV）キャッシュの消費メモリ量とデコード時の計算量は系列長に比例して増大する。本稿では、Global KV キャッシュのスロット数に上限を設けながら長文文脈を保持・想起するための注意機構 **AnchorMassAttention** を設計し、同一の 158.6M パラメータ構成を持つ標準 Transformer（以下 **Standard-150M**）との対照実験結果を報告する。
 
@@ -20,7 +19,7 @@ AnchorMassAttention は4つの要素から構成される。第一に、注意�
 158.6M パラメータのチェックポイントペアを用いた 4K から 256K トークンの実測評価において、以下の利得、代償、および実験上の留意点が観測された（メモリ単位: $1\text{ MiB} = 2^{20}\text{ B}$, $1\text{ GiB} = 2^{30}\text{ B}$）。
 
 1. **有界な KV キャッシュ容量とピーク VRAM の挙動**:
-   Standard-150M の KV キャッシュサイズが 32K トークン時の 1,344 MiB から 256K トークン時の 10,752 MiB へと線形増加するのに対し、AnchorMass-150M は上限 $M_{\max} = 8,192$ スロットの設定により、別枠固定バッファを含めたモデル全体の総 KV キャッシュ容量を 32K から 256K の測定全域で **実測 258.58 MiB（純粋 BF16 構成時 173.27 MiB）に厳密に束縛** した。ただし、プロセス全体のピーク VRAM は 32K 時の 1.87 GiB から 256K 時の 4.95 GiB へ増加した。これは、評価時に両モデルが GPU 上に同時常駐していたこと、および各層の Dynamic NTK RoPE 位置テーブル（256K 時で 1.75 GiB）が系列長に応じて拡張されたことに起因する。
+   Standard-150M の KV キャッシュサイズが 32K トークン時の 1,344 MiB から 256K トークン時の 10,752 MiB へと線形増加するのに対し、AnchorMass-150M は上限 $M_{\max} = 8,192$ スロットの設定により、別枠固定バッファを含めたモデル全体の総 KV キャッシュ容量を 32K から 256K の測定全域で **実測 258.58 MiB（純粋 BF16 構成時 173.27 MiB）に一定化** した。ただし、プロセス全体のピーク VRAM は 32K 時の 1.87 GiB から 256K 時の 4.95 GiB へ増加した。これは、評価時に両モデルが GPU 上に同時常駐していたこと、および各層の Dynamic NTK RoPE 位置テーブル（256K 時で 1.75 GiB）が系列長に応じて拡張されたことに起因する。
 2. **実装パイプライン込みの推論速度と損益分岐点（推定値）**:
    Prefill 時間は、1,024 トークン刻みの逐次圧縮を伴う AnchorMass-150M の方が、一括 FlashAttention-2 [11] を用いる Standard-150M より 3.6〜12 倍遅い。デコード速度も 64K トークン以下では Standard-150M が高速である。一方、AnchorMass-150M のデコード速度中央値は 4K から 256K の全域で毎秒 75.2〜76.6 トークンと安定して推移し、128K および 256K において逆転した。なお、Prefill 遅延を相殺する概算損益分岐点は 128K で約 1,036 トークン、256K で約 603 トークン（実測中央値からの外挿推定値）であり、短出力タスクにおける総実行時間は Standard-150M の方が短い。
 3. **言語モデリング・想起・短文推論の観測差**:
@@ -28,7 +27,7 @@ AnchorMassAttention は4つの要素から構成される。第一に、注意�
 
 ---
 
-## 1. Introduction（背景と検討課題）
+## 1. Introduction
 
 長文脈を処理する自己回帰型 Transformer において、過去の全トークンに対する Key と Value を無圧縮で保持する標準キャッシュ方式は、系列長 $T$ に比例して KV キャッシュメモリとデコード時のメモリアクセス負荷を増大させる。
 
@@ -40,7 +39,7 @@ AnchorMassAttention は4つの要素から構成される。第一に、注意�
 
 ---
 
-## 2. Architecture: AnchorMassAttention の設計と定式化
+## 2. Architecture
 
 AnchorMassAttention を組み込んだ言語モデル **AnchorMass-150M**（略称 **AM-150M**）は、Pre-RMSNorm [12] と SwiGLU FFN [13] で構成される 14 層の Transformer であり、自己注意層を [`AnchorMassAttention`](../anchormass/model.py#L176-L921) に置き換えている。処理の全体像を図1に示す。
 
@@ -120,7 +119,7 @@ Global 圧縮キャッシュ（`g_sum_k`, `g_sum_v`, `g_n`）が上限 $M_{\max}
 
 ---
 
-## 3. Experimental Setup（158.6M 対照実験の構成・統制条件・評価プロトコル）
+## 3. Experimental Setup
 
 ### 3.1 モデル仕様とハードウェア環境
 両モデルは語彙数 28,000、層数 14、隠れ層次元 768、FFN 次元 2,560、ヘッド数 12 で完全に共通しており、総パラメータ数はともに 158,635,776（158.6M）である。
@@ -166,7 +165,7 @@ flowchart LR
 
 ---
 
-## 4. Empirical Results（実験結果と観測された限界）
+## 4. Empirical Results
 
 ### 4.1 システムプロファイル：KV キャッシュ量、ピーク VRAM、推論速度、および損益分岐点
 Stage 3a 重みを用い、RTX 6000 Ada 上で測定した推論プロファイル実測値を表1に示す。
@@ -193,7 +192,7 @@ xychart-beta
 
 **実測結果の分析**:
 1. **総 KV キャッシュ容量とデータ型**:
-   Standard-150M の KV キャッシュサイズが 256K トークンで 10,752 MiB に達するのに対し、AnchorMass-150M は Global 圧縮キャッシュ上限（$M_{\max}=8,192$ スロット）と別枠固定バッファ（Sink 16、Local 64、端数 48 トークン）により、32K 以降の総 KV キャッシュ容量を **実測 258.58 MiB（四捨五入 259 MiB）** に厳密に束縛した。本評価スイートの CUDA `autocast`（BF16）条件下では、Key キャッシュが FP32（4 bytes）、Value キャッシュが BF16（2 bytes）、質量テンソルが FP32（4 bytes）で保持される。なお、Key も BF16 で保持する純粋 BF16 構成時の総容量は **173.27 MiB** となる（詳細なテンソル内訳は Appendix A 参照）。
+   Standard-150M の KV キャッシュサイズが 256K トークンで 10,752 MiB に達するのに対し、AnchorMass-150M は Global 圧縮キャッシュ上限（$M_{\max}=8,192$ スロット）と別枠固定バッファ（Sink 16、Local 64、端数 48 トークン）により、32K 以降の総 KV キャッシュ容量を **実測 258.58 MiB（四捨五入 259 MiB）** に厳密に制限した。本評価スイートの CUDA `autocast`（BF16）条件下では、Key キャッシュが FP32（4 bytes）、Value キャッシュが BF16（2 bytes）、質量テンソルが FP32（4 bytes）で保持される。なお、Key も BF16 で保持する純粋 BF16 構成時の総容量は **173.27 MiB** となる（詳細なテンソル内訳は Appendix A 参照）。
 2. **ピーク VRAM の挙動（両モデル常駐と RoPE テーブル拡張）**:
    表1の Peak VRAM は、両モデルが GPU 上に同時常駐した状態で計測したプロセス全体の最大割り当て量である。AnchorMass-150M 実行時の Peak VRAM が 32K 時の 1.87 GiB から 256K 時の 4.95 GiB へ増加している主因は、全 14 層がそれぞれ長さ $P + 128$ の FP32 RoPE テーブル（256K 時で 1.75 GiB）を重複生成・保持しているためである（4K 時の 1.04 GiB が 8K 時の 0.93 GiB より大きいのは初回一時バッファ確保による）。
 3. **推論速度とエンドツーエンド損益分岐点（推定値）**:
@@ -295,7 +294,7 @@ Stage 1、Stage 2、Stage 3b では両モデル間に有意な性能差は検出
 
 ---
 
-## 5. Discussion & Limitations（考察と未解決課題）
+## 5. Discussion & Limitations
 
 ### 5.1 構成要素別アブレーションの欠如
 本稿の実験は AnchorMassAttention 全体を一括で有効化した比較にとどまり、(a) Value 外れ値分離スロット、(b) 背景加重平均とアンカー Key、(c) $+\log(n)$ 質量バイアス近似、(d) Local / Global Head 分割比率の個別寄与を切り分けることができていない。要素別の系統的アブレーションが最優先課題である。
@@ -312,12 +311,12 @@ Stage 3a の合成データ生成は作成日由来の単一シード（`seed=20
 
 ---
 
-## 6. Conclusion（結論）
+## 6. Conclusion
 
 本稿では、Value ベクトル空間の外れ値分離ブロック圧縮、質量バイアス近似付き Global Attention、およびエネルギー指標マージを統合した **AnchorMassAttention** を提案し、158.6M パラメータの **AnchorMass-150M** を実装して標準 Transformer（Standard-150M）との実測比較を行った。本研究の結論は以下の通り総括される。
 
 1. **実証された利得とメモリ特性**:
-   - **有界 KV キャッシュと長系列デコード速度の維持**: 32K から 256K の系列長において、Standard-150M の総 KV キャッシュが 1,344 MiB から 10,752 MiB へ線形増大するのに対し、AnchorMass-150M は **総 KV キャッシュ容量を実測 258.58 MiB（純粋 BF16 構成時 173.27 MiB）に厳密に束縛** し、4K から 256K にわたりデコード速度中央値を **75.2〜76.6 tok/s** の一定水準に維持した。
+   - **有界 KV キャッシュと長系列デコード速度の維持**: 32K から 256K の系列長において、Standard-150M の総 KV キャッシュが 1,344 MiB から 10,752 MiB へ線形増大するのに対し、AnchorMass-150M は **総 KV キャッシュ容量を実測 258.58 MiB（純粋 BF16 構成時 173.27 MiB）に一定化** し、4K から 256K にわたりデコード速度中央値を **75.2〜76.6 tok/s** の一定水準に維持した。
    - **言語モデリング・想起・短文知識保持**: 本学習・推論パイプラインにおいて、AnchorMass-150M は 2K〜32K の長文 PPL で Standard-150M を下回り（$p_{\text{Holm}} \le 0.0137$）、16K〜64K の Needle 想起率で上回った。また、8K 極限圧縮比較（$n=30$）において提案 adaptive ポリシーが他方式を上回り、32K 長文 SFT 後の JCommonsenseQA（$N=1,119$）においても短文推論精度を保持した（57.37% 対 52.73%、$p = 0.00062$）。
 2. **実用上の代償と主張範囲の限界**:
    - **総実行時間の制約**: Prefill 時間が大幅に遅いため、超長文領域でデコード速度が逆転しても、総実行時間で優位となるには数百〜1,000 トークン以上の長文生成が必要であり、短出力タスクの高速化を主張するものではない。
